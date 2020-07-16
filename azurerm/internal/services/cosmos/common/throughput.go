@@ -19,6 +19,25 @@ func GetThroughputFromResult(throughputResponse documentdb.ThroughputSettingsGet
 	return res.Throughput
 }
 
+func GetMaxThroughputFromResult(throughputResponse documentdb.ThroughputSettingsGetResults) *int32 {
+	props := throughputResponse.ThroughputSettingsGetProperties
+	if props == nil {
+		return nil
+	}
+
+	res := props.Resource
+	if res == nil {
+		return nil
+	}
+
+	autoscaleSettings := res.AutoscaleSettings
+	if autoscaleSettings == nil {
+		return nil
+	}
+
+	return autoscaleSettings.MaxThroughput
+}
+
 func ConvertThroughputFromResourceData(throughput interface{}) *int32 {
 	return utils.Int32(int32(throughput.(int)))
 }

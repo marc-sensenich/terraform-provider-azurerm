@@ -70,6 +70,14 @@ func resourceArmCosmosDbSQLDatabase() *schema.Resource {
 				Computed:     true,
 				ValidateFunc: validate.CosmosThroughput,
 			},
+
+			"max_throughput": {
+				Type:          schema.TypeInt,
+				Optional:      true,
+				Computed:      true,
+				ConflictsWith: []string{"throughput"},
+				ValidateFunc:  validate.CosmosMaxThroughput,
+			},
 		},
 	}
 }
@@ -108,7 +116,17 @@ func resourceArmCosmosDbSQLDatabaseCreate(d *schema.ResourceData, meta interface
 	}
 
 	if throughput, hasThroughput := d.GetOk("throughput"); hasThroughput {
-		db.SQLDatabaseCreateUpdateProperties.Options.Throughput = common.ConvertThroughputFromResourceData(throughput)
+		if throughput != 0 {
+			db.SQLDatabaseCreateUpdateProperties.Options.Throughput = common.ConvertThroughputFromResourceData(throughput)
+		}
+	}
+
+	if maxThroughput, hasMaxThroughput := d.GetOk("max_throughput"); hasMaxThroughput {
+		if maxThroughput != 0 {
+			db.SQLDatabaseCreateUpdateProperties.Options.AutoscaleSettings = &documentdb.AutoscaleSettings{
+				MaxThroughput: common.ConvertThroughputFromResourceData(maxThroughput),
+			}
+		}
 	}
 
 	future, err := client.CreateUpdateSQLDatabase(ctx, resourceGroup, account, name, db)
@@ -162,13 +180,21 @@ func resourceArmCosmosDbSQLDatabaseUpdate(d *schema.ResourceData, meta interface
 		return fmt.Errorf("Error waiting on create/update future for Cosmos SQL Database %q (Account: %q): %+v", id.Name, id.Account, err)
 	}
 
-	if d.HasChange("throughput") {
+	if d.HasChanges("throughput", "max_throughput") {
 		throughputParameters := documentdb.ThroughputSettingsUpdateParameters{
 			ThroughputSettingsUpdateProperties: &documentdb.ThroughputSettingsUpdateProperties{
-				Resource: &documentdb.ThroughputSettingsResource{
-					Throughput: common.ConvertThroughputFromResourceData(d.Get("throughput")),
-				},
+				Resource: &documentdb.ThroughputSettingsResource{},
 			},
+		}
+
+		if d.Get("throughput").(int) != 0 {
+			throughputParameters.ThroughputSettingsUpdateProperties.Resource.Throughput = common.ConvertThroughputFromResourceData(d.Get("throughput"))
+		}
+
+		if d.Get("max_throughput").(int) != 0 {
+			throughputParameters.ThroughputSettingsUpdateProperties.Resource.AutoscaleSettings = &documentdb.AutoscaleSettingsResource{
+				MaxThroughput: common.ConvertThroughputFromResourceData(d.Get("max_throughput")),
+			}
 		}
 
 		throughputFuture, err := client.UpdateSQLDatabaseThroughput(ctx, id.ResourceGroup, id.Account, id.Name, throughputParameters)
@@ -222,9 +248,11 @@ func resourceArmCosmosDbSQLDatabaseRead(d *schema.ResourceData, meta interface{}
 			return fmt.Errorf("Error reading Throughput on Cosmos SQL Database %q (Account: %q) ID: %v", id.Name, id.Account, err)
 		} else {
 			d.Set("throughput", nil)
+			d.Set("max_throughput", nil)
 		}
 	} else {
 		d.Set("throughput", common.GetThroughputFromResult(throughputResp))
+		d.Set("max_throughput", common.GetMaxThroughputFromResult(throughputResp))
 	}
 
 	return nil
