@@ -235,14 +235,12 @@ resource "azurerm_cosmosdb_sql_container" "test" {
 func testAccAzureRMCosmosDbSqlContainer_autoscale(data acceptance.TestData, maxThroughput int) string {
 	return fmt.Sprintf(`
 %[1]s
-
 resource "azurerm_cosmosdb_sql_container" "test" {
   name                = "acctest-CSQLC-%[2]d"
   resource_group_name = azurerm_cosmosdb_account.test.resource_group_name
   account_name        = azurerm_cosmosdb_account.test.name
   database_name       = azurerm_cosmosdb_sql_database.test.name
   partition_key_path  = "/definition/id"
-
   autoscale_settings {
     max_throughput = %[3]d
   }

@@ -20,6 +20,12 @@ resource "azurerm_cosmosdb_sql_container" "example" {
   database_name       = azurerm_cosmosdb_sql_database.example.name
   partition_key_path  = "/definition/id"
   throughput          = 400
+  
+  index_policy {
+    indexing_mode  = "Consistent"
+    included_paths = ["/*"]
+    excluded_paths = ["/example/*"]
+  }
 
   unique_key {
     paths = ["/definition/idlong", "/definition/idshort"]
@@ -48,6 +54,7 @@ The following arguments are supported:
 * `autoscale_settings` - (Optional) An `autoscale_settings` block as defined below. This must be set upon database creation otherwise it cannot be updated without a manual terraform destroy-apply. Requires `partition_key_path` to be set.
 
 ~> **Note:** Switching between autoscale and manual throughput is not supported via Terraform and must be completed via the Azure Portal and refreshed. 
+* `index_policy` - (Optional) The configuration of the indexing policy.
 
 * `default_ttl` - (Optional) The default time to live of SQL container. If missing, items are not expired automatically. If present and the value is set to `-1`, it is equal to infinity, and items don’t expire by default. If present and the value is set to some number `n` – items will expire `n` seconds after their last modified time.
 
@@ -61,6 +68,14 @@ An `autoscale_settings` block supports the following:
 A `unique_key` block supports the following:
 
 * `paths` - (Required) A list of paths to use for this unique key.
+
+An `index_policy` block supports the following:
+
+* `indexing_mode` - (Optional) Indicates the indexing mode. Possible values include: `Consistent`, `Lazy`, `None`. Defaults to `Consistent`.
+
+* `included_paths` - (Optional) List of paths to include in the indexing. Required if `indexing_mode` is `Consistent` or `Lazy`. Defaults to `["/*"]`.
+
+* `excluded_paths` - (Optional) List of paths to exclude from indexing. Required if `indexing_mode` is `Consistent` or `Lazy`. Defaults to `[]`.
 
 
 ## Attributes Reference
