@@ -11,22 +11,22 @@ func expandAzureRmCosmosDBIndexingPolicyIncludedPaths(input []interface{}) *[]do
 		return nil
 	}
 
-	var paths []documentdb.IncludedPath
+	var includedPaths []documentdb.IncludedPath
 
 	for _, v := range input {
-		block := v.(map[string]interface{})
+		includedPath := v.(map[string]interface{})
 		path := documentdb.IncludedPath{
-			Path: utils.String(block["path"].(string)),
+			Path: utils.String(includedPath["path"].(string)),
 		}
 
-		if v, ok := block["index"].([]interface{}); ok {
-			path.Indexes = expandCosmosDBIndexingPolicyIncludedPathIndexes(v)
+		if indexes, ok := includedPath["index"].([]interface{}); ok {
+			path.Indexes = expandCosmosDBIndexingPolicyIncludedPathIndexes(indexes)
 		}
 
-		paths = append(paths, path)
+		includedPaths = append(includedPaths, path)
 	}
 
-	return &paths
+	return &includedPaths
 }
 
 func expandCosmosDBIndexingPolicyIncludedPathIndexes(input []interface{}) *[]documentdb.Indexes {
@@ -66,7 +66,9 @@ func expandAzureRmCosmosDBIndexingPolicyExcludedPaths(input []interface{}) *[]do
 
 func ExpandAzureRmCosmosDbIndexingPolicy(d *schema.ResourceData) *documentdb.IndexingPolicy {
 	i := d.Get("indexing_policy").([]interface{})
-	policy := &documentdb.IndexingPolicy{}
+	policy := &documentdb.IndexingPolicy{
+		Automatic: utils.Bool(true),
+	}
 
 	if len(i) == 0 || i[0] == nil {
 		policy.IndexingMode = documentdb.Consistent
@@ -90,17 +92,23 @@ func ExpandAzureRmCosmosDbIndexingPolicy(d *schema.ResourceData) *documentdb.Ind
 	return policy
 }
 
-func flattenCosmosDBIndexingPolicyExcludedPaths(paths *[]documentdb.ExcludedPath) []interface{} {
-	if paths == nil {
+func flattenCosmosDBIndexingPolicyExcludedPaths(input *[]documentdb.ExcludedPath) []interface{} {
+	if input == nil {
 		return nil
 	}
 
-	var excludedPaths []interface{}
-	for _, v := range *paths {
+	excludedPaths := make([]interface{}, 0)
+
+	for _, v := range *input {
+		// _etag is automatically added by the server and should be excluded on flattening
+		// as the user isn't setting it and it will show changes in state.
 		if *v.Path == "/\"_etag\"/?" {
 			continue
 		}
-		excludedPaths = append(excludedPaths, *v.Path)
+
+		block := make(map[string]interface{})
+		block["path"] = v.Path
+		excludedPaths = append(excludedPaths, block)
 	}
 
 	return excludedPaths
@@ -116,7 +124,7 @@ func flattenCosmosDBIndexingPolicyIncludedPaths(input *[]documentdb.IncludedPath
 	for _, v := range *input {
 		block := make(map[string]interface{})
 		block["path"] = v.Path
-		block["indexes"] = flattenCosmosDBIndexingPolicyIncludedPathIndexes(v.Indexes)
+		block["index"] = flattenCosmosDBIndexingPolicyIncludedPathIndexes(v.Indexes)
 		includedPaths = append(includedPaths, block)
 	}
 
@@ -151,8 +159,8 @@ func FlattenAzureRmCosmosDbIndexingPolicy(indexingPolicy *documentdb.IndexingPol
 
 	result := make(map[string]interface{}, 0)
 	result["indexing_mode"] = string(indexingPolicy.IndexingMode)
-	result["included_paths"] = flattenCosmosDBIndexingPolicyIncludedPaths(indexingPolicy.IncludedPaths)
-	result["excluded_paths"] = flattenCosmosDBIndexingPolicyExcludedPaths(indexingPolicy.ExcludedPaths)
+	result["included_path"] = flattenCosmosDBIndexingPolicyIncludedPaths(indexingPolicy.IncludedPaths)
+	result["excluded_path"] = flattenCosmosDBIndexingPolicyExcludedPaths(indexingPolicy.ExcludedPaths)
 
 	results = append(results, result)
 	return results

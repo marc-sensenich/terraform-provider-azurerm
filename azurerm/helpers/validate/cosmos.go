@@ -67,3 +67,44 @@ func CosmosMaxThroughput(i interface{}, k string) (warnings []string, errors []e
 
 	return warnings, errors
 }
+
+func CosmosIndexingPolicy(v interface{}, k string) (warnings []string, errors []error) {
+	indexingPolicy, ok := v.(map[string]interface{})
+	if !ok {
+		return warnings, []error{fmt.Errorf("expected type of %q to be map", k)}
+	}
+
+	if indexingPolicy == nil {
+		return nil, nil
+	}
+
+	// Any indexing policy has to include the root path /* as either an included or an excluded path.
+	rootPath := "/*"
+	rootPathIncluded := false
+	var possiblePaths []interface{}
+
+	if includedPaths, exists := indexingPolicy["included_path"]; exists {
+		possiblePaths = append(possiblePaths, includedPaths.([]interface{}))
+	}
+
+	if excludedPaths, exists := indexingPolicy["excluded_path"]; exists {
+		possiblePaths = append(possiblePaths, excludedPaths.([]interface{}))
+	}
+
+	for _, i := range possiblePaths {
+		if possiblePath, ok := i.(map[string]interface{}); ok {
+			if path, ok := possiblePath["path"].(string); ok {
+				if path == rootPath {
+					rootPathIncluded = true
+					break
+				}
+			}
+		}
+	}
+
+	if !rootPathIncluded {
+		errors = append(errors, fmt.Errorf("the root path '%q' must be included as either an included_path or excluded_path under %q", rootPath, k))
+	}
+
+	return warnings, errors
+}

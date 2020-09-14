@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/services/cosmos-db/mgmt/2020-04-01/documentdb"
+
 	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/acceptance"
@@ -123,6 +125,42 @@ func TestAccAzureRMCosmosDbSqlContainer_autoscale(t *testing.T) {
 	})
 }
 
+func TestAccAzureRMCosmosDbSqlContainer_indexing_policy(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_cosmosdb_sql_container", "test")
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:     func() { acceptance.PreCheck(t) },
+		Providers:    acceptance.SupportedProviders,
+		CheckDestroy: testCheckAzureRMCosmosDbSqlContainerDestroy,
+		Steps: []resource.TestStep{
+			{
+
+				Config: testAccAzureRMCosmosDbSqlContainer_basic(data),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testCheckAzureRMCosmosDbSqlContainerExists(data.ResourceName),
+				),
+			},
+			data.ImportStep(),
+			{
+
+				Config: testAccAzureRMCosmosDbSqlContainer_indexing_policy(data, string(documentdb.Consistent), "/includedPath01/*", "/excludedPath01/?"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testCheckAzureRMCosmosDbSqlContainerExists(data.ResourceName),
+				),
+			},
+			data.ImportStep(),
+			{
+
+				Config: testAccAzureRMCosmosDbSqlContainer_indexing_policy(data, string(documentdb.Lazy), "/includedPath02/*", "/excludedPath02/?"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testCheckAzureRMCosmosDbSqlContainerExists(data.ResourceName),
+				),
+			},
+			data.ImportStep(),
+		},
+	})
+}
+
 func testCheckAzureRMCosmosDbSqlContainerDestroy(s *terraform.State) error {
 	client := acceptance.AzureProvider.Meta().(*clients.Client).Cosmos.SqlClient
 	ctx := acceptance.AzureProvider.Meta().(*clients.Client).StopContext
@@ -209,6 +247,27 @@ resource "azurerm_cosmosdb_sql_container" "test" {
   }
   default_ttl = 500
   throughput  = 600
+  indexing_policy {
+    indexing_mode = "Consistent"
+
+    included_path {
+      path = "/*"
+    }
+
+    included_path {
+      path = "/testing/id1/*"
+      
+      index {
+        data_type = "String"
+        precision = -1
+        kind = "Hash"
+      }
+    }
+
+    excluded_path {
+      path = "/testing/id2/*"
+    }
+  }
 }
 `, testAccAzureRMCosmosDbSqlDatabase_basic(data), data.RandomInteger)
 }
@@ -228,6 +287,27 @@ resource "azurerm_cosmosdb_sql_container" "test" {
   }
   default_ttl = 1000
   throughput  = 400
+  indexing_policy {
+    indexing_mode = "Lazy"
+
+    included_path {
+      path = "/*"
+    }
+
+    included_path {
+      path = "/testing/id2/*"
+      
+      index {
+        data_type = "String"
+        precision = -1
+        kind = "Hash"
+      }
+    }
+
+    excluded_path {
+      path = "/testing/id1/*"
+    }
+  }
 }
 `, testAccAzureRMCosmosDbSqlDatabase_basic(data), data.RandomInteger)
 }
@@ -246,4 +326,33 @@ resource "azurerm_cosmosdb_sql_container" "test" {
   }
 }
 `, testAccAzureRMCosmosDbSqlDatabase_basic(data), data.RandomInteger, maxThroughput)
+}
+
+func testAccAzureRMCosmosDbSqlContainer_indexing_policy(data acceptance.TestData, indexingMode, includedPath, excludedPath string) string {
+	return fmt.Sprintf(`
+%[1]s
+
+resource "azurerm_cosmosdb_sql_container" "test" {
+  name                = "acctest-CSQLC-%[2]d"
+  resource_group_name = azurerm_cosmosdb_account.test.resource_group_name
+  account_name        = azurerm_cosmosdb_account.test.name
+  database_name       = azurerm_cosmosdb_sql_database.test.name
+
+  indexing_policy {
+    indexing_mode = "%s"
+
+    included_path {
+      path = "/*"
+    }
+
+    included_path {
+      path = "%s"
+    }
+
+    excluded_path {
+      path = "%s"
+    }
+  }
+}
+`, testAccAzureRMCosmosDbSqlDatabase_basic(data), data.RandomInteger, indexingMode, includedPath, excludedPath)
 }
