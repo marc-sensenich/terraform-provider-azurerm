@@ -19,6 +19,7 @@ require (
 	github.com/hashicorp/terraform-plugin-sdk v1.16.1-0.20210222152151-32f0219df5b5
 	github.com/rickb777/date v1.12.5-0.20200422084442-6300e543c4d9
 	github.com/sergi/go-diff v1.1.0
+	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/terraform-providers/terraform-provider-azuread v0.9.0
 	github.com/tombuildsstuff/giovanni v0.15.1
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
